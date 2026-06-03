@@ -1,4 +1,31 @@
 @import 'tailwindcss';
 @plugin "daisyui" {
-  themes: corporate --default;
+  themes: corporate --default, dim;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.hero-swiper .swiper-pagination-bullet {
+  background: #333;
+  opacity: 0.3;
+  width: 10px;
+  height: 10px;
+}
+.hero-swiper .swiper-pagination-bullet-active {
+  opacity: 1;
+  background: #333;
+}
+
+.banner-headline {
+  font-family: 'Poppins', sans-serif;
+}
+
+.navbar {
+  min-height: 3rem;
 }

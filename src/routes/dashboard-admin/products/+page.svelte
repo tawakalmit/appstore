@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { App } from '$lib/types';
+	import type { App, Category } from '$lib/types';
 
 	let products = $state<App[]>([]);
+	let categories = $state<Category[]>([]);
 	let loading = $state(true);
 	let showModal = $state(false);
 	let editMode = $state(false);
 	let deleteConfirm = $state<string | null>(null);
+	let uploading = $state(false);
 
 	// Form state
 	let form = $state({
@@ -18,6 +20,7 @@
 		type: 'apk' as 'apk' | 'webapp',
 		price: 0,
 		icon_url: '',
+		screenshots: [] as string[],
 		category: '',
 		developer: '',
 		version: '1.0.0',
@@ -25,8 +28,13 @@
 		demo_url: ''
 	});
 
+	// Preview state
+	let iconPreview = $state('');
+	let screenshotPreviews = $state<string[]>([]);
+
 	onMount(() => {
 		loadProducts();
+		loadCategories();
 	});
 
 	async function loadProducts() {
@@ -36,6 +44,13 @@
 			products = await res.json();
 		}
 		loading = false;
+	}
+
+	async function loadCategories() {
+		const res = await fetch('/dashboard-admin/api/categories');
+		if (res.ok) {
+			categories = await res.json();
+		}
 	}
 
 	function openCreate() {
@@ -49,12 +64,15 @@
 			type: 'apk',
 			price: 0,
 			icon_url: '',
+			screenshots: [],
 			category: '',
 			developer: '',
 			version: '1.0.0',
 			download_url: '',
 			demo_url: ''
 		};
+		iconPreview = '';
+		screenshotPreviews = [];
 		showModal = true;
 	}
 
@@ -69,13 +87,88 @@
 			type: product.type,
 			price: product.price,
 			icon_url: product.icon_url,
+			screenshots: product.screenshots || [],
 			category: product.category,
 			developer: product.developer,
 			version: product.version,
 			download_url: product.download_url,
 			demo_url: product.demo_url || ''
 		};
+		iconPreview = product.icon_url || '';
+		screenshotPreviews = product.screenshots || [];
 		showModal = true;
+	}
+
+	async function uploadFile(file: File, folder: string): Promise<string | null> {
+		const formData = new FormData();
+		formData.append('file', file);
+		formData.append('folder', folder);
+
+		const res = await fetch('/dashboard-admin/api/upload', {
+			method: 'POST',
+			body: formData
+		});
+
+		if (res.ok) {
+			const data = await res.json();
+			return data.url;
+		}
+		return null;
+	}
+
+	async function handleIconUpload(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		// Show local preview immediately
+		iconPreview = URL.createObjectURL(file);
+		uploading = true;
+
+		const url = await uploadFile(file, 'icons');
+		if (url) {
+			form.icon_url = url;
+			iconPreview = url;
+		}
+		uploading = false;
+	}
+
+	async function handleScreenshotUpload(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const files = input.files;
+		if (!files || files.length === 0) return;
+
+		uploading = true;
+
+		for (const file of Array.from(files)) {
+			// Show local preview immediately
+			const localPreview = URL.createObjectURL(file);
+			screenshotPreviews = [...screenshotPreviews, localPreview];
+
+			const url = await uploadFile(file, 'screenshots');
+			if (url) {
+				form.screenshots = [...form.screenshots, url];
+			} else {
+				// Upload failed, remove the preview
+				screenshotPreviews = screenshotPreviews.filter(p => p !== localPreview);
+			}
+		}
+
+		// Sync previews with actual uploaded URLs
+		screenshotPreviews = [...form.screenshots];
+		uploading = false;
+		// Reset input
+		input.value = '';
+	}
+
+	function removeScreenshot(index: number) {
+		form.screenshots = form.screenshots.filter((_, i) => i !== index);
+		screenshotPreviews = form.screenshots;
+	}
+
+	function removeIcon() {
+		form.icon_url = '';
+		iconPreview = '';
 	}
 
 	async function handleSubmit() {
@@ -199,7 +292,7 @@
 <!-- Product Modal -->
 {#if showModal}
 	<div class="modal modal-open">
-		<div class="modal-box max-w-2xl">
+		<div class="modal-box max-w-2xl max-h-[90vh] overflow-y-auto">
 			<h3 class="font-bold text-lg mb-4">{editMode ? 'Edit Produk' : 'Tambah Produk Baru'}</h3>
 			<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -224,7 +317,12 @@
 					</div>
 					<div class="form-control">
 						<label class="label" for="prod-category"><span class="label-text">Kategori</span></label>
-						<input id="prod-category" type="text" class="input input-bordered" bind:value={form.category} required />
+						<select id="prod-category" class="select select-bordered" bind:value={form.category} required>
+							<option value="" disabled>Pilih Kategori</option>
+							{#each categories as cat}
+								<option value={cat.name}>{cat.name}</option>
+							{/each}
+						</select>
 					</div>
 					<div class="form-control">
 						<label class="label" for="prod-developer"><span class="label-text">Developer</span></label>
@@ -235,9 +333,58 @@
 						<input id="prod-version" type="text" class="input input-bordered" bind:value={form.version} />
 					</div>
 					<div class="form-control">
-						<label class="label" for="prod-icon"><span class="label-text">Icon URL</span></label>
-						<input id="prod-icon" type="text" class="input input-bordered" bind:value={form.icon_url} />
+						<label class="label"><span class="label-text">Harga (Info)</span></label>
+						<input type="text" class="input input-bordered" value={formatPrice(form.price)} disabled />
 					</div>
+
+					<!-- Icon Upload -->
+					<div class="form-control md:col-span-2">
+						<label class="label"><span class="label-text">Icon Produk</span></label>
+						<div class="flex items-start gap-4">
+							{#if iconPreview}
+								<div class="relative">
+									<img src={iconPreview} alt="Icon preview" class="w-20 h-20 rounded-xl object-cover border border-base-300" />
+									<button type="button" class="btn btn-circle btn-xs btn-error absolute -top-2 -right-2" onclick={removeIcon}>
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+									</button>
+								</div>
+							{/if}
+							<label class="flex flex-col items-center justify-center w-20 h-20 border-2 border-dashed border-base-300 rounded-xl cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors">
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+								</svg>
+								<span class="text-xs text-base-content/40 mt-1">Upload</span>
+								<input type="file" class="hidden" accept="image/*" onchange={handleIconUpload} />
+							</label>
+						</div>
+					</div>
+
+					<!-- Screenshots Upload -->
+					<div class="form-control md:col-span-2">
+						<label class="label"><span class="label-text">Screenshots</span></label>
+						<div class="flex flex-wrap items-start gap-3">
+							{#each screenshotPreviews as screenshot, i}
+								<div class="relative">
+									<img src={screenshot} alt="Screenshot {i + 1}" class="w-28 h-20 rounded-lg object-cover border border-base-300" />
+									<button type="button" class="btn btn-circle btn-xs btn-error absolute -top-2 -right-2" onclick={() => removeScreenshot(i)}>
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+									</button>
+								</div>
+							{/each}
+							<label class="flex flex-col items-center justify-center w-28 h-20 border-2 border-dashed border-base-300 rounded-lg cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors">
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+								</svg>
+								<span class="text-xs text-base-content/40 mt-1">Tambah</span>
+								<input type="file" class="hidden" accept="image/*" multiple onchange={handleScreenshotUpload} />
+							</label>
+						</div>
+					</div>
+
 					<div class="form-control md:col-span-2">
 						<label class="label" for="prod-short-desc"><span class="label-text">Deskripsi Singkat</span></label>
 						<input id="prod-short-desc" type="text" class="input input-bordered" bind:value={form.short_description} />
@@ -256,9 +403,16 @@
 					</div>
 				</div>
 
+				{#if uploading}
+					<div class="mt-4 flex items-center gap-2 text-sm text-base-content/60">
+						<span class="loading loading-spinner loading-xs"></span>
+						Mengupload file...
+					</div>
+				{/if}
+
 				<div class="modal-action">
 					<button type="button" class="btn" onclick={() => showModal = false}>Batal</button>
-					<button type="submit" class="btn btn-primary">{editMode ? 'Simpan' : 'Tambah'}</button>
+					<button type="submit" class="btn btn-primary" disabled={uploading}>{editMode ? 'Simpan' : 'Tambah'}</button>
 				</div>
 			</form>
 		</div>

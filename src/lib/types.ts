@@ -25,3 +25,18 @@ export interface Category {
 	slug: string;
 	icon: string;
 }
+
+export interface Banner {
+	id: string;
+	headline: string;
+	description: string;
+	btn_text: string;
+	btn_link: string;
+	desktop_image: string;
+	mobile_image: string;
+	icon_url: string;
+	icon_text: string;
+	text_color: 'dark' | 'light';
+	sort_order: number;
+	active: boolean;
+}

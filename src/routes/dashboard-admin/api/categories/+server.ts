@@ -3,49 +3,65 @@ import { getCategories, createCategory, updateCategory, deleteCategory } from '$
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async () => {
-	return json(getCategories());
+	try {
+		const categories = await getCategories();
+		return json(categories);
+	} catch (e) {
+		return json({ message: 'Gagal memuat kategori' }, { status: 500 });
+	}
 };
 
 export const POST: RequestHandler = async ({ request }) => {
-	const data = await request.json();
-	const category = {
-		id: crypto.randomUUID(),
-		name: data.name || '',
-		slug: data.slug || data.name?.toLowerCase().replace(/\s+/g, '-') || '',
-		icon: data.icon || '📦'
-	};
+	try {
+		const data = await request.json();
+		const category = {
+			name: data.name || '',
+			slug: data.slug || data.name?.toLowerCase().replace(/\s+/g, '-') || '',
+			icon: data.icon || '📦'
+		};
 
-	const created = createCategory(category);
-	return json(created, { status: 201 });
+		const created = await createCategory(category);
+		return json(created, { status: 201 });
+	} catch (e) {
+		return json({ message: 'Gagal menambah kategori' }, { status: 500 });
+	}
 };
 
 export const PUT: RequestHandler = async ({ request }) => {
-	const data = await request.json();
-	const { id, ...rest } = data;
+	try {
+		const data = await request.json();
+		const { id, ...rest } = data;
 
-	if (!id) {
-		return json({ message: 'ID diperlukan' }, { status: 400 });
+		if (!id) {
+			return json({ message: 'ID diperlukan' }, { status: 400 });
+		}
+
+		const updated = await updateCategory(id, rest);
+		if (!updated) {
+			return json({ message: 'Kategori tidak ditemukan' }, { status: 404 });
+		}
+
+		return json(updated);
+	} catch (e) {
+		return json({ message: 'Gagal mengupdate kategori' }, { status: 500 });
 	}
-
-	const updated = updateCategory(id, rest);
-	if (!updated) {
-		return json({ message: 'Kategori tidak ditemukan' }, { status: 404 });
-	}
-
-	return json(updated);
 };
 
 export const DELETE: RequestHandler = async ({ request }) => {
-	const { id } = await request.json();
+	try {
+		const { id } = await request.json();
 
-	if (!id) {
-		return json({ message: 'ID diperlukan' }, { status: 400 });
+		if (!id) {
+			return json({ message: 'ID diperlukan' }, { status: 400 });
+		}
+
+		const deleted = await deleteCategory(id);
+		if (!deleted) {
+			return json({ message: 'Kategori tidak ditemukan' }, { status: 404 });
+		}
+
+		return json({ success: true });
+	} catch (e) {
+		return json({ message: 'Gagal menghapus kategori' }, { status: 500 });
 	}
-
-	const deleted = deleteCategory(id);
-	if (!deleted) {
-		return json({ message: 'Kategori tidak ditemukan' }, { status: 404 });
-	}
-
-	return json({ success: true });
 };

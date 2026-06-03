@@ -1,93 +1,102 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { resolve, dirname } from 'path';
+import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 import type { App, Category } from '$lib/types';
 
-const DATA_DIR = resolve('data');
-const PRODUCTS_FILE = resolve(DATA_DIR, 'products.json');
-const CATEGORIES_FILE = resolve(DATA_DIR, 'categories.json');
-
-function readJSON<T>(filePath: string): T[] {
-	if (!existsSync(filePath)) {
-		return [];
-	}
-	try {
-		const raw = readFileSync(filePath, 'utf-8');
-		return JSON.parse(raw);
-	} catch {
-		return [];
-	}
-}
-
-function writeJSON<T>(filePath: string, data: T[]) {
-	const dir = dirname(filePath);
-	if (!existsSync(dir)) {
-		mkdirSync(dir, { recursive: true });
-	}
-	writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-}
+const supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY);
 
 // Products
-export function getProducts(): App[] {
-	return readJSON<App>(PRODUCTS_FILE);
+export async function getProducts(): Promise<App[]> {
+	const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+	if (error) throw error;
+	return data || [];
 }
 
-export function getProduct(id: string): App | undefined {
-	return getProducts().find((p) => p.id === id);
+export async function getProduct(id: string): Promise<App | null> {
+	const { data, error } = await supabase.from('products').select('*').eq('id', id).single();
+	if (error) return null;
+	return data;
 }
 
-export function createProduct(product: App): App {
-	const products = getProducts();
-	products.push(product);
-	writeJSON(PRODUCTS_FILE, products);
-	return product;
+export async function createProduct(product: Omit<App, 'id'>): Promise<App> {
+	const { data, error } = await supabase.from('products').insert(product).select().single();
+	if (error) throw error;
+	return data;
 }
 
-export function updateProduct(id: string, data: Partial<App>): App | null {
-	const products = getProducts();
-	const index = products.findIndex((p) => p.id === id);
-	if (index === -1) return null;
-	products[index] = { ...products[index], ...data, updated_at: new Date().toISOString() };
-	writeJSON(PRODUCTS_FILE, products);
-	return products[index];
+export async function updateProduct(id: string, updates: Partial<App>): Promise<App | null> {
+	const { data, error } = await supabase
+		.from('products')
+		.update({ ...updates, updated_at: new Date().toISOString() })
+		.eq('id', id)
+		.select()
+		.single();
+	if (error) return null;
+	return data;
 }
 
-export function deleteProduct(id: string): boolean {
-	const products = getProducts();
-	const filtered = products.filter((p) => p.id !== id);
-	if (filtered.length === products.length) return false;
-	writeJSON(PRODUCTS_FILE, filtered);
-	return true;
+export async function deleteProduct(id: string): Promise<boolean> {
+	const { error } = await supabase.from('products').delete().eq('id', id);
+	return !error;
 }
 
 // Categories
-export function getCategories(): Category[] {
-	return readJSON<Category>(CATEGORIES_FILE);
+export async function getCategories(): Promise<Category[]> {
+	const { data, error } = await supabase.from('categories').select('*').order('name');
+	if (error) throw error;
+	return data || [];
 }
 
-export function getCategory(id: string): Category | undefined {
-	return getCategories().find((c) => c.id === id);
+export async function getCategory(id: string): Promise<Category | null> {
+	const { data, error } = await supabase.from('categories').select('*').eq('id', id).single();
+	if (error) return null;
+	return data;
 }
 
-export function createCategory(category: Category): Category {
-	const categories = getCategories();
-	categories.push(category);
-	writeJSON(CATEGORIES_FILE, categories);
-	return category;
+export async function createCategory(category: Omit<Category, 'id'>): Promise<Category> {
+	const { data, error } = await supabase.from('categories').insert(category).select().single();
+	if (error) throw error;
+	return data;
 }
 
-export function updateCategory(id: string, data: Partial<Category>): Category | null {
-	const categories = getCategories();
-	const index = categories.findIndex((c) => c.id === id);
-	if (index === -1) return null;
-	categories[index] = { ...categories[index], ...data };
-	writeJSON(CATEGORIES_FILE, categories);
-	return categories[index];
+export async function updateCategory(id: string, updates: Partial<Category>): Promise<Category | null> {
+	const { data, error } = await supabase.from('categories').update(updates).eq('id', id).select().single();
+	if (error) return null;
+	return data;
 }
 
-export function deleteCategory(id: string): boolean {
-	const categories = getCategories();
-	const filtered = categories.filter((c) => c.id !== id);
-	if (filtered.length === categories.length) return false;
-	writeJSON(CATEGORIES_FILE, filtered);
-	return true;
+export async function deleteCategory(id: string): Promise<boolean> {
+	const { error } = await supabase.from('categories').delete().eq('id', id);
+	return !error;
+}
+
+// Banners
+import type { Banner } from '$lib/types';
+
+export async function getBanners(): Promise<Banner[]> {
+	const { data, error } = await supabase.from('banners').select('*').eq('active', true).order('sort_order');
+	if (error) throw error;
+	return data || [];
+}
+
+export async function getAllBanners(): Promise<Banner[]> {
+	const { data, error } = await supabase.from('banners').select('*').order('sort_order');
+	if (error) throw error;
+	return data || [];
+}
+
+export async function createBanner(banner: Omit<Banner, 'id'>): Promise<Banner> {
+	const { data, error } = await supabase.from('banners').insert(banner).select().single();
+	if (error) throw error;
+	return data;
+}
+
+export async function updateBanner(id: string, updates: Partial<Banner>): Promise<Banner | null> {
+	const { data, error } = await supabase.from('banners').update(updates).eq('id', id).select().single();
+	if (error) return null;
+	return data;
+}
+
+export async function deleteBanner(id: string): Promise<boolean> {
+	const { error } = await supabase.from('banners').delete().eq('id', id);
+	return !error;
 }

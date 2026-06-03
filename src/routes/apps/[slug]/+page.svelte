@@ -1,52 +1,13 @@
 <script lang="ts">
 	import type { App } from '$lib/types';
-	import { page } from '$app/state';
+
+	let { data } = $props();
+	const app: App = data.app;
 
 	function formatPrice(price: number): string {
 		if (price === 0) return 'Gratis';
 		return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
 	}
-
-	// In production, this would come from Supabase based on the slug
-	const app: App = {
-		id: '1',
-		name: 'WhatsApp Business Pro',
-		slug: 'whatsapp-business-pro',
-		description: `WhatsApp Business Pro adalah solusi komunikasi bisnis yang dirancang khusus untuk pemilik usaha kecil dan menengah. Aplikasi ini menawarkan fitur-fitur canggih yang tidak tersedia di versi reguler.
-
-Fitur Utama:
-• Auto-reply pesan pelanggan
-• Katalog produk terintegrasi
-• Analitik pesan dan respons
-• Label untuk organisasi chat
-• Quick replies untuk FAQ
-• Broadcast message ke banyak kontak
-• Integrasi dengan CRM populer
-
-Cocok untuk:
-- Toko online
-- Jasa layanan profesional
-- Restoran dan kafe
-- Freelancer`,
-		short_description: 'Chat bisnis profesional dengan fitur lengkap',
-		type: 'apk',
-		price: 49000,
-		icon_url: 'https://placehold.co/128x128/4F46E5/white?text=WA',
-		screenshots: [
-			'https://placehold.co/400x700/E5E7EB/374151?text=Screenshot+1',
-			'https://placehold.co/400x700/E5E7EB/374151?text=Screenshot+2',
-			'https://placehold.co/400x700/E5E7EB/374151?text=Screenshot+3',
-			'https://placehold.co/400x700/E5E7EB/374151?text=Screenshot+4'
-		],
-		category: 'Bisnis',
-		developer: 'TokoApps Dev',
-		version: '2.1.0',
-		download_url: '#',
-		rating: 4.8,
-		total_downloads: 15230,
-		created_at: '2024-01-01',
-		updated_at: '2024-01-15'
-	};
 </script>
 
 <svelte:head>
@@ -67,7 +28,11 @@ Cocok untuk:
 	<div class="flex flex-col lg:flex-row gap-8">
 		<div class="flex-1">
 			<div class="flex items-start gap-5 mb-6">
-				<img src={app.icon_url} alt={app.name} class="w-24 h-24 rounded-2xl shadow-md" />
+				{#if app.icon_url}
+					<img src={app.icon_url} alt={app.name} class="w-24 h-24 rounded-2xl shadow-md object-cover" />
+				{:else}
+					<div class="w-24 h-24 rounded-2xl shadow-md bg-base-200 flex items-center justify-center text-3xl">📱</div>
+				{/if}
 				<div>
 					<h1 class="text-3xl font-bold">{app.name}</h1>
 					<p class="text-base-content/60 mt-1">{app.developer}</p>
@@ -84,33 +49,30 @@ Cocok untuk:
 			<!-- Stats Row -->
 			<div class="flex flex-wrap gap-6 mb-8 p-4 bg-base-200 rounded-xl">
 				<div class="text-center">
-					<div class="flex items-center gap-1 text-warning">
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current" viewBox="0 0 24 24">
-							<path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-						</svg>
-						<span class="font-bold text-lg">{app.rating}</span>
-					</div>
-					<p class="text-xs text-base-content/50">Rating</p>
-				</div>
-				<div class="text-center">
-					<p class="font-bold text-lg">{(app.total_downloads / 1000).toFixed(1)}K</p>
-					<p class="text-xs text-base-content/50">Downloads</p>
-				</div>
-				<div class="text-center">
 					<p class="font-bold text-lg">{app.type === 'apk' ? 'Android' : 'Browser'}</p>
 					<p class="text-xs text-base-content/50">Platform</p>
+				</div>
+				<div class="text-center">
+					<p class="font-bold text-lg">v{app.version}</p>
+					<p class="text-xs text-base-content/50">Versi</p>
+				</div>
+				<div class="text-center">
+					<p class="font-bold text-lg">{app.category}</p>
+					<p class="text-xs text-base-content/50">Kategori</p>
 				</div>
 			</div>
 
 			<!-- Screenshots -->
-			<div class="mb-8">
-				<h2 class="text-xl font-bold mb-4">Screenshots</h2>
-				<div class="flex gap-4 overflow-x-auto pb-4">
-					{#each app.screenshots as screenshot, i}
-						<img src={screenshot} alt="Screenshot {i + 1}" class="rounded-xl h-64 object-cover shadow-sm" />
-					{/each}
+			{#if app.screenshots && app.screenshots.length > 0}
+				<div class="mb-8">
+					<h2 class="text-xl font-bold mb-4">Screenshots</h2>
+					<div class="flex gap-4 overflow-x-auto pb-4">
+						{#each app.screenshots as screenshot, i}
+							<img src={screenshot} alt="Screenshot {i + 1}" class="rounded-xl h-64 object-cover shadow-sm" />
+						{/each}
+					</div>
 				</div>
-			</div>
+			{/if}
 
 			<!-- Description -->
 			<div class="mb-8">
@@ -143,8 +105,8 @@ Cocok untuk:
 					</button>
 					
 					{#if app.demo_url}
-						<a href={app.demo_url} class="btn btn-outline btn-block">
-							Coba Demo
+						<a href={`https://wa.me/6285156837220?text=${encodeURIComponent(`Halo, saya ingin request demo untuk aplikasi "${app.name}". Terima kasih.`)}`} target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-block">
+							Request Demo
 						</a>
 					{/if}
 
